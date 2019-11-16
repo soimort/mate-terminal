@@ -8,6 +8,7 @@ A fork of the [mate-terminal](https://github.com/mate-desktop/mate-terminal/tree
 $ ./autogen.sh
 $ ./configure \
     --prefix=/usr \
+    --with-gtk=2.0 \
     --sysconfdir=/etc \
     --disable-static --localstatedir=/var --with-gnu-ld
 $ make
