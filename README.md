@@ -1,6 +1,6 @@
 # mate-terminal
 
-A fork of the mate-terminal emulator (1.23.0).
+A fork of the [mate-terminal](https://github.com/mate-desktop/mate-terminal) emulator (1.23.0).
 
 ## How to build
 
