@@ -141,6 +141,7 @@ terminal_tab_label_constructor (GType type,
 	                  G_CALLBACK (close_button_clicked_cb), tab_label);
 
 	gtk_widget_show_all (hbox);
+	gtk_widget_hide (close_button);
 
 	return object;
 }
