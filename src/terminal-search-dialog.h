@@ -1,6 +1,7 @@
 /*
  * Copyright © 2005 Paolo Maggi
  * Copyright © 2010 Red Hat (Red Hat author: Behdad Esfahbod)
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +23,7 @@
 #define TERMINAL_SEARCH_DIALOG_H
 
 #include <gtk/gtk.h>
+#include <vte/vte.h>
 
 G_BEGIN_DECLS
 
@@ -30,7 +32,6 @@ typedef enum _TerminalSearchFlags
     TERMINAL_SEARCH_FLAG_BACKWARDS	= 1 << 0,
     TERMINAL_SEARCH_FLAG_WRAP_AROUND	= 1 << 1
 } TerminalSearchFlags;
-
 
 GtkWidget	*terminal_search_dialog_new		(GtkWindow   *parent);
 
@@ -43,7 +44,7 @@ const gchar 	*terminal_search_dialog_get_search_text	(GtkWidget   *dialog);
 
 TerminalSearchFlags
 terminal_search_dialog_get_search_flags(GtkWidget   *dialog);
-GRegex		*terminal_search_dialog_get_regex	(GtkWidget   *dialog);
+VteRegex	*terminal_search_dialog_get_regex	(GtkWidget   *dialog);
 
 G_END_DECLS
 

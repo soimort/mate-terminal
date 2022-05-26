@@ -1,6 +1,7 @@
 /*
  * Copyright © 2005 Paolo Maggi
  * Copyright © 2010 Red Hat (Red Hat author: Behdad Esfahbod)
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +26,9 @@
 #include "terminal-search-dialog.h"
 #include "terminal-util.h"
 
+#define PCRE2_CODE_UNIT_WIDTH 0
+#include <pcre2.h>
+
 #define HISTORY_MIN_ITEM_LEN 3
 #define HISTORY_LENGTH 10
 
@@ -38,7 +42,6 @@ get_quark (void)
 
 	return quark;
 }
-
 
 #define TERMINAL_SEARCH_DIALOG_GET_PRIVATE(object) \
   ((TerminalSearchDialogPrivate *) g_object_get_qdata (G_OBJECT (object), get_quark ()))
@@ -60,10 +63,9 @@ typedef struct _TerminalSearchDialogPrivate
 	GtkEntryCompletion *completion;
 
 	/* Cached regex */
-	GRegex *regex;
-	GRegexCompileFlags regex_compile_flags;
+	VteRegex *regex;
+	guint32 regex_compile_flags;
 } TerminalSearchDialogPrivate;
-
 
 static void update_sensitivity (void *unused,
                                 GtkWidget *dialog);
@@ -71,7 +73,6 @@ static void response_handler (GtkWidget *dialog,
                               gint       response_id,
                               gpointer   data);
 static void terminal_search_dialog_private_destroy (TerminalSearchDialogPrivate *priv);
-
 
 GtkWidget *
 terminal_search_dialog_new (GtkWindow   *parent)
@@ -100,7 +101,6 @@ terminal_search_dialog_new (GtkWindow   *parent)
 
 	g_object_set_qdata_full (G_OBJECT (dialog), get_quark (), priv,
 	                         (GDestroyNotify) terminal_search_dialog_private_destroy);
-
 
 	priv->search_text_entry = gtk_bin_get_child (GTK_BIN (priv->search_entry));
 	gtk_widget_set_size_request (priv->search_entry, 300, -1);
@@ -153,14 +153,13 @@ terminal_search_dialog_private_destroy (TerminalSearchDialogPrivate *priv)
 {
 
 	if (priv->regex)
-		g_regex_unref (priv->regex);
+		vte_regex_unref (priv->regex);
 
 	g_object_unref (priv->store);
 	g_object_unref (priv->completion);
 
 	g_free (priv);
 }
-
 
 static void
 update_sensitivity (void *unused, GtkWidget *dialog)
@@ -171,7 +170,7 @@ update_sensitivity (void *unused, GtkWidget *dialog)
 
 	if (priv->regex)
 	{
-		g_regex_unref (priv->regex);
+		vte_regex_unref (priv->regex);
 		priv->regex = NULL;
 	}
 
@@ -283,7 +282,6 @@ response_handler (GtkWidget *dialog,
 		history_entry_insert (priv->store, str);
 }
 
-
 void
 terminal_search_dialog_set_search_text (GtkWidget   *dialog,
                                         const gchar *text)
@@ -336,11 +334,11 @@ terminal_search_dialog_get_search_flags (GtkWidget *dialog)
 	return flags;
 }
 
-GRegex *
+VteRegex *
 terminal_search_dialog_get_regex (GtkWidget *dialog)
 {
 	TerminalSearchDialogPrivate *priv;
-	GRegexCompileFlags compile_flags;
+	guint32 compile_flags;
 	const char *text, *pattern;
 
 	g_return_val_if_fail (GTK_IS_DIALOG (dialog), NULL);
@@ -350,13 +348,13 @@ terminal_search_dialog_get_regex (GtkWidget *dialog)
 
 	pattern = text = terminal_search_dialog_get_search_text (dialog);
 
-	compile_flags = G_REGEX_OPTIMIZE;
+	compile_flags = PCRE2_MULTILINE | PCRE2_UTF | PCRE2_NO_UTF_CHECK;
 
 	if (!GET_FLAG (match_case_checkbutton))
-		compile_flags |= G_REGEX_CASELESS;
+		compile_flags |= PCRE2_CASELESS;
 
 	if (GET_FLAG (regex_checkbutton))
-		compile_flags |= G_REGEX_MULTILINE;
+		compile_flags |= PCRE2_UCP;
 	else
 		pattern = g_regex_escape_string (text, -1);
 
@@ -372,10 +370,12 @@ terminal_search_dialog_get_regex (GtkWidget *dialog)
 	{
 		priv->regex_compile_flags = compile_flags;
 		if (priv->regex)
-			g_regex_unref (priv->regex);
+			vte_regex_unref (priv->regex);
 
 		/* TODO Error handling */
-		priv->regex = g_regex_new (pattern, compile_flags, 0, NULL);
+		priv->regex = vte_regex_new_for_search(pattern, -1,
+						       compile_flags, NULL);
+
 	}
 
 	if (pattern != text)

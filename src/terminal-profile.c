@@ -2,6 +2,7 @@
  * Copyright © 2001 Havoc Pennington
  * Copyright © 2002 Mathias Hasselmann
  * Copyright © 2008 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * Mate-terminal is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -133,7 +134,6 @@ enum
 #define DEFAULT_BOLD_COLOR_SAME_AS_FG (TRUE)
 #define DEFAULT_BACKGROUND_DARKNESS   (0.5)
 #define DEFAULT_BACKGROUND_IMAGE_FILE ("")
-#define DEFAULT_BACKGROUND_IMAGE      (NULL)
 #define DEFAULT_BACKGROUND_TYPE       (TERMINAL_BACKGROUND_SOLID)
 #define DEFAULT_BACKSPACE_BINDING     (VTE_ERASE_ASCII_DELETE)
 #define DEFAULT_CURSOR_BLINK_MODE     (VTE_CURSOR_BLINK_SYSTEM)
@@ -520,26 +520,38 @@ terminal_profile_reset_property_internal (TerminalProfile *profile,
 	/* A few properties don't have defaults via the param spec; set them explicitly */
 	switch (pspec->param_id)
 	{
-	case PROP_FOREGROUND_COLOR:
-	case PROP_BOLD_COLOR:
-		g_value_set_boxed (value, &DEFAULT_FOREGROUND_COLOR);
-		break;
+		case PROP_FOREGROUND_COLOR:
+		case PROP_BOLD_COLOR:
+		{
+			GdkRGBA color;
 
-	case PROP_BACKGROUND_COLOR:
-		g_value_set_boxed (value, &DEFAULT_BACKGROUND_COLOR);
-		break;
+			if (!gdk_rgba_parse (&color, DEFAULT_FOREGROUND_COLOR))
+				return;
+			color.alpha = 1.0;
+			g_value_set_boxed (value, &color);
+			break;
+		}
+		case PROP_BACKGROUND_COLOR:
+		{
+			GdkRGBA color;
 
-	case PROP_FONT:
-		g_value_take_boxed (value, pango_font_description_from_string (DEFAULT_FONT));
-		break;
+			if (!gdk_rgba_parse (&color, DEFAULT_BACKGROUND_COLOR))
+				return;
+			color.alpha = 1.0;
+			g_value_set_boxed (value, &color);
+			break;
+		}
+		case PROP_FONT:
+			g_value_take_boxed (value, pango_font_description_from_string (DEFAULT_FONT));
+			break;
 
-	case PROP_PALETTE:
-		set_value_from_palette (value, DEFAULT_PALETTE, TERMINAL_PALETTE_SIZE);
-		break;
+		case PROP_PALETTE:
+			set_value_from_palette (value, DEFAULT_PALETTE, TERMINAL_PALETTE_SIZE);
+			break;
 
-	default:
-		g_param_value_set_default (pspec, value);
-		break;
+		default:
+			g_param_value_set_default (pspec, value);
+			break;
 	}
 
 	if (notify)

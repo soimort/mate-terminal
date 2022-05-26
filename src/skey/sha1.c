@@ -10,10 +10,6 @@
 #include "skeyutil.h"
 #include "sha1.h"
 
-
-#define SHA1_DIGESTSIZE       20
-#define SHA1_BLOCKSIZE        64
-
 #define HTONDIGEST(x) { \
       x[0] = htonl(x[0]); \
       x[1] = htonl(x[1]); \
@@ -38,7 +34,6 @@ static void byteReverse(unsigned char *buf, unsigned longs)
 	while (--longs);
 }
 #endif
-
 
 int SHA1Keycrunch(char *result, const char *seed, const char *passphrase)
 {

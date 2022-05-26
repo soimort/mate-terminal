@@ -1,6 +1,7 @@
 /*
  * Copyright © 2002 Red Hat, Inc.
  * Copyright © 2008 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * Mate-terminal is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -158,8 +159,8 @@ terminal_encoding_new (const char *charset,
 	encoding->refcount = 1;
 	encoding->id = g_strdup (charset);
 	encoding->name = g_strdup (display_name);
-	encoding->valid = encoding->validity_checked = force_valid;
-	encoding->is_custom = is_custom;
+	encoding->valid = encoding->validity_checked = (force_valid != FALSE);
+	encoding->is_custom = (is_custom != FALSE);
 	encoding->is_active = FALSE;
 
 	return encoding;
@@ -248,7 +249,7 @@ terminal_encoding_is_valid (TerminalEncoding *encoding)
 			                       " input  \"%s\"\n",
 			                       ascii_sample);
 			_terminal_debug_print (TERMINAL_DEBUG_ENCODINGS,
-			                       " output \"%s\" bytes read %u written %u\n",
+			                       " output \"%s\" bytes read %" G_GSIZE_FORMAT " written %" G_GSIZE_FORMAT "\n",
 			                       converted ? converted : "(null)", bytes_read, bytes_written);
 			if (error)
 				_terminal_debug_print (TERMINAL_DEBUG_ENCODINGS,
@@ -290,7 +291,6 @@ update_active_encodings_gsettings (void)
 	GSList *list, *l;
 	GArray *strings;
 	const gchar *id_string;
-	GSettings *settings;
 
 	list = terminal_app_get_active_encodings (terminal_app_get ());
 	strings = g_array_new (TRUE, TRUE, sizeof (gchar *));
@@ -302,9 +302,7 @@ update_active_encodings_gsettings (void)
 		strings = g_array_append_val (strings, id_string);
 	}
 
-	settings = g_settings_new (CONF_GLOBAL_SCHEMA);
-	g_settings_set_strv (settings, "active-encodings", (const gchar **) strings->data);
-	g_object_unref (settings);
+	g_settings_set_strv (settings_global, "active-encodings", (const gchar **) strings->data);
 
 	g_array_free (strings, TRUE);
 	g_slist_foreach (list, (GFunc) terminal_encoding_unref, NULL);
@@ -591,7 +589,6 @@ terminal_encodings_get_builtins (void)
 	encodings_hashtable = g_hash_table_new_full (g_str_hash, g_str_equal,
 	                      NULL,
 	                      (GDestroyNotify) terminal_encoding_unref);
-
 
 	/* Placeholder entry for the current locale's charset */
 	encoding = terminal_encoding_new ("current",

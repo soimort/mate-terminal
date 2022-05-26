@@ -1,18 +1,20 @@
-[encoding: UTF-8]
 # List of source files containing translatable strings.
 # Please keep this file sorted alphabetically.
-mate-terminal.appdata.xml.in
+mate-terminal.appdata.xml.in.in
 mate-terminal.desktop.in.in
-src/eggsmclient.c
-[type: gettext/gsettings]src/org.mate.terminal.gschema.xml.in
+src/confirm-close-dialog.ui
+src/mate-submodules/libegg/eggsmclient.c
+src/encodings-dialog.ui
+src/extra-strings.c
+src/find-dialog.ui
+src/keybinding-editor.ui
+src/org.mate.terminal.gschema.xml.in
 src/profile-editor.c
-[type: gettext/glade]src/encodings-dialog.ui
-[type: gettext/glade]src/find-dialog.ui
-[type: gettext/glade]src/keybinding-editor.ui
-[type: gettext/glade]src/profile-manager.ui
-[type: gettext/glade]src/profile-new-dialog.ui
-[type: gettext/glade]src/profile-preferences.ui
-[type: gettext/glade]src/skey-challenge.ui
+src/profile-manager.ui
+src/profile-new-dialog.ui
+src/profile-preferences.ui
+src/set-title-dialog.ui
+src/skey-challenge.ui
 src/skey-popup.c
 src/terminal-accels.c
 src/terminal-app.c
@@ -26,4 +28,3 @@ src/terminal-tab-label.c
 src/terminal-tabs-menu.c
 src/terminal-util.c
 src/terminal-window.c
-src/extra-strings.c

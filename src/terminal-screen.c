@@ -1,6 +1,7 @@
 /*
  * Copyright © 2001 Havoc Pennington
  * Copyright © 2007, 2008, 2010 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * Mate-terminal is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,6 +45,9 @@
 #include "terminal-info-bar.h"
 
 #include "eggshell.h"
+
+#define PCRE2_CODE_UNIT_WIDTH 0
+#include <pcre2.h>
 
 #define URL_MATCH_CURSOR  (GDK_HAND2)
 #define SKEY_MATCH_CURSOR (GDK_HAND2)
@@ -158,33 +162,32 @@ typedef struct
 {
 	const char *pattern;
 	TerminalURLFlavour flavor;
-	GRegexCompileFlags flags;
+	guint32 flags;
 } TerminalRegexPattern;
 
 static const TerminalRegexPattern url_regex_patterns[] =
 {
-	{ SCHEME "//(?:" USERPASS "\\@)?" HOST PORT URLPATH, FLAVOR_AS_IS, G_REGEX_CASELESS },
-	{ "(?:www|ftp)" HOSTCHARS_CLASS "*\\." HOST PORT URLPATH , FLAVOR_DEFAULT_TO_HTTP, G_REGEX_CASELESS  },
-	{ "(?:callto:|h323:|sip:)" USERCHARS_CLASS "[" USERCHARS ".]*(?:" PORT "/[a-z0-9]+)?\\@" HOST, FLAVOR_VOIP_CALL, G_REGEX_CASELESS  },
-	{ "(?:mailto:)?" USERCHARS_CLASS "[" USERCHARS ".]*\\@" HOSTCHARS_CLASS "+\\." HOST, FLAVOR_EMAIL, G_REGEX_CASELESS  },
-	{ "news:[[:alnum:]\\Q^_{|}~!\"#$%&'()*+,./;:=?`\\E]+", FLAVOR_AS_IS, G_REGEX_CASELESS  },
+	{ SCHEME "//(?:" USERPASS "\\@)?" HOST PORT URLPATH, FLAVOR_AS_IS, PCRE2_CASELESS },
+	{ "(?:www|ftp)" HOSTCHARS_CLASS "*\\." HOST PORT URLPATH , FLAVOR_DEFAULT_TO_HTTP, PCRE2_CASELESS  },
+	{ "(?:callto:|h323:|sip:)" USERCHARS_CLASS "[" USERCHARS ".]*(?:" PORT "/[a-z0-9]+)?\\@" HOST, FLAVOR_VOIP_CALL, PCRE2_CASELESS  },
+	{ "(?:mailto:)?" USERCHARS_CLASS "[" USERCHARS ".]*\\@" HOSTCHARS_CLASS "+\\." HOST, FLAVOR_EMAIL, PCRE2_CASELESS  },
+	{ "news:[[:alnum:]\\Q^_{|}~!\"#$%&'()*+,./;:=?`\\E]+", FLAVOR_AS_IS, PCRE2_CASELESS  },
 };
 
-static GRegex **url_regexes;
+static VteRegex **url_regexes;
 static TerminalURLFlavour *url_regex_flavors;
 static guint n_url_regexes;
 
 static void terminal_screen_url_match_remove (TerminalScreen *screen);
 
-
 #ifdef ENABLE_SKEY
 static const TerminalRegexPattern skey_regex_patterns[] =
 {
-	{ "s/key [[:digit:]]* [-[:alnum:]]*",         FLAVOR_AS_IS },
-	{ "otp-[a-z0-9]* [[:digit:]]* [-[:alnum:]]*", FLAVOR_AS_IS },
+	{ "s/key [[:digit:]]* [-[:alnum:]]*",         FLAVOR_AS_IS, 0 },
+	{ "otp-[a-z0-9]* [[:digit:]]* [-[:alnum:]]*", FLAVOR_AS_IS, 0 },
 };
 
-static GRegex **skey_regexes;
+static VteRegex **skey_regexes;
 static guint n_skey_regexes;
 
 static void  terminal_screen_skey_match_remove (TerminalScreen            *screen);
@@ -570,16 +573,15 @@ terminal_screen_class_init (TerminalScreenClass *klass)
 
 	/* Precompile the regexes */
 	n_url_regexes = G_N_ELEMENTS (url_regex_patterns);
-	url_regexes = g_new0 (GRegex*, n_url_regexes);
+	url_regexes = g_new0 (VteRegex*, n_url_regexes);
 	url_regex_flavors = g_new0 (TerminalURLFlavour, n_url_regexes);
 
 	for (i = 0; i < n_url_regexes; ++i)
 	{
 		GError *error = NULL;
 
-		url_regexes[i] = g_regex_new (url_regex_patterns[i].pattern,
-		                              url_regex_patterns[i].flags | G_REGEX_OPTIMIZE | G_REGEX_MULTILINE,
-		                              0, &error);
+		url_regexes[i] = vte_regex_new_for_match(url_regex_patterns[i].pattern, -1,
+				                         url_regex_patterns[i].flags | PCRE2_MULTILINE, &error);
 		if (error)
 		{
 			g_message ("%s", error->message);
@@ -591,15 +593,14 @@ terminal_screen_class_init (TerminalScreenClass *klass)
 
 #ifdef ENABLE_SKEY
 	n_skey_regexes = G_N_ELEMENTS (skey_regex_patterns);
-	skey_regexes = g_new0 (GRegex*, n_skey_regexes);
+	skey_regexes = g_new0 (VteRegex*, n_skey_regexes);
 
 	for (i = 0; i < n_skey_regexes; ++i)
 	{
 		GError *error = NULL;
 
-		skey_regexes[i] = g_regex_new (skey_regex_patterns[i].pattern,
-		                               G_REGEX_OPTIMIZE | G_REGEX_MULTILINE,
-		                               0, &error);
+		skey_regexes[i] = vte_regex_new_for_match(skey_regex_patterns[i].pattern, -1,
+							  PCRE2_MULTILINE | PCRE2_UTF | PCRE2_NO_UTF_CHECK, &error);
 		if (error)
 		{
 			g_message ("%s", error->message);
@@ -1014,7 +1015,7 @@ terminal_screen_profile_notify_cb (TerminalProfile *profile,
 
 				tag_data = g_slice_new (TagData);
 				tag_data->flavor = FLAVOR_SKEY;
-				tag_data->tag = vte_terminal_match_add_gregex (vte_terminal, skey_regexes[i], 0);
+				tag_data->tag = vte_terminal_match_add_regex (vte_terminal, skey_regexes[i], 0);
 				vte_terminal_match_set_cursor_type (vte_terminal, tag_data->tag, SKEY_MATCH_CURSOR);
 
 				priv->match_tags = g_slist_prepend (priv->match_tags, tag_data);
@@ -1059,7 +1060,7 @@ terminal_screen_profile_notify_cb (TerminalProfile *profile,
 
 				tag_data = g_slice_new (TagData);
 				tag_data->flavor = url_regex_flavors[i];
-				tag_data->tag = vte_terminal_match_add_gregex (vte_terminal, url_regexes[i], 0);
+				tag_data->tag = vte_terminal_match_add_regex (vte_terminal, url_regexes[i], 0);
 				vte_terminal_match_set_cursor_type (vte_terminal, tag_data->tag, URL_MATCH_CURSOR);
 
 				priv->match_tags = g_slist_prepend (priv->match_tags, tag_data);
@@ -1166,6 +1167,7 @@ terminal_screen_set_font (TerminalScreen *screen)
 	TerminalScreenPrivate *priv = screen->priv;
 	TerminalProfile *profile;
 	PangoFontDescription *desc;
+	int size;
 
 	profile = priv->profile;
 
@@ -1175,14 +1177,11 @@ terminal_screen_set_font (TerminalScreen *screen)
 		g_object_get (profile, TERMINAL_PROFILE_FONT, &desc, NULL);
 	g_assert (desc);
 
+	size = pango_font_description_get_size (desc);
 	if (pango_font_description_get_size_is_absolute (desc))
-		pango_font_description_set_absolute_size (desc,
-		        priv->font_scale *
-		        pango_font_description_get_size (desc));
+		pango_font_description_set_absolute_size (desc, priv->font_scale * size);
 	else
-		pango_font_description_set_size (desc,
-		                                 priv->font_scale *
-		                                 pango_font_description_get_size (desc));
+		pango_font_description_set_size (desc, (int)(priv->font_scale * size));
 
 	vte_terminal_set_font (VTE_TERMINAL (screen), desc);
 
@@ -1444,7 +1443,11 @@ get_child_environment (TerminalScreen *screen,
 	g_hash_table_replace (env_table, g_strdup ("TERM"), g_strdup ("xterm-256color")); /* FIXME configurable later? */
 
 	/* FIXME: moving the tab between windows, or the window between displays will make the next two invalid... */
-	g_hash_table_replace (env_table, g_strdup ("WINDOWID"), g_strdup_printf ("%ld", GDK_WINDOW_XID (gtk_widget_get_window (window))));
+#ifdef GDK_WINDOWING_X11
+    if (GDK_IS_X11_DISPLAY (display)) {
+        g_hash_table_replace (env_table, g_strdup ("WINDOWID"), g_strdup_printf ("%ld", GDK_WINDOW_XID (gtk_widget_get_window (window))));
+    }
+#endif
 	g_hash_table_replace (env_table, g_strdup ("DISPLAY"), g_strdup (gdk_display_get_name (display)));
 
 	g_settings_schema_source_list_schemas (g_settings_schema_source_get_default (), TRUE, &list_schemas, NULL);
@@ -1531,8 +1534,6 @@ static void handle_error_child (TerminalScreen *screen,
 	                    info_bar, FALSE, FALSE, 0);
 	gtk_info_bar_set_default_response (GTK_INFO_BAR (info_bar), GTK_RESPONSE_CANCEL);
 	gtk_widget_show (info_bar);
-
-	g_error_free (err);
 }
 
 static void term_spawn_callback (GtkWidget *terminal,
@@ -1545,7 +1546,6 @@ static void term_spawn_callback (GtkWidget *terminal,
 	if (error)
 	{
 		handle_error_child (screen, error);
-		g_error_free (error);
 	}
 	else
 	{
@@ -1949,13 +1949,17 @@ terminal_screen_child_exited (VteTerminal *terminal, int status)
 	switch (action)
 	{
 	case TERMINAL_EXIT_CLOSE:
-		g_signal_emit (screen, signals[CLOSE_SCREEN], 0);
+		if ((status != 9) || (priv->override_command != NULL))
+			g_signal_emit (screen, signals[CLOSE_SCREEN], 0);
 		break;
 	case TERMINAL_EXIT_RESTART:
 		terminal_screen_launch_child_on_idle (screen);
 		break;
 	case TERMINAL_EXIT_HOLD:
 	{
+		if ((status == 9) && (priv->override_command == NULL))
+			break;
+
 		GtkWidget *info_bar;
 
 		info_bar = terminal_info_bar_new (GTK_MESSAGE_INFO,

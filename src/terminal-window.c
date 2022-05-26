@@ -2,6 +2,7 @@
  * Copyright © 2001 Havoc Pennington
  * Copyright © 2002 Red Hat, Inc.
  * Copyright © 2007, 2008, 2009 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * Mate-terminal is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -105,8 +106,6 @@ struct _TerminalWindowPrivate
     guint disposed : 1;
     guint present_on_insert : 1;
 
-    /* Workaround until gtk+ bug #535557 is fixed */
-    guint icon_title_set : 1;
     time_t focus_time;
 
     /* should we copy selection to clibpoard */
@@ -401,7 +400,6 @@ terminal_window_ReadInteger (char  *string,
 #define YValue          0x0002
 #define WidthValue      0x0004
 #define HeightValue     0x0008
-#define AllValues       0x000F
 #define XNegative       0x0010
 #define YNegative       0x0020
 
@@ -1477,9 +1475,6 @@ popup_clipboard_targets_received_cb (GtkClipboard *clipboard,
     GtkAction *action;
     gboolean can_paste, can_paste_uris, show_link, show_email_link, show_call_link, show_input_method_menu;
     int n_pages;
-    GdkEvent *event;
-    GdkSeat *seat;
-    GdkDevice *device;
 
     if (!gtk_widget_get_realized (GTK_WIDGET (screen)))
     {
@@ -1552,17 +1547,11 @@ popup_clipboard_targets_received_cb (GtkClipboard *clipboard,
     if (!gtk_menu_get_attach_widget (GTK_MENU (popup_menu)))
         gtk_menu_attach_to_widget (GTK_MENU (popup_menu),GTK_WIDGET (screen),NULL);
 
-    event = gtk_get_current_event ();
-
-    seat = gdk_display_get_default_seat (gdk_display_get_default());
-
-    device = gdk_seat_get_pointer (seat);
-
-    gdk_event_set_device (event, device);
-
-    gtk_menu_popup_at_pointer (GTK_MENU (popup_menu), (const GdkEvent*) event);
-
-    gdk_event_free (event);
+    gtk_menu_popup (GTK_MENU (popup_menu),
+                    NULL, NULL,
+                    NULL, NULL,
+                    info->button,
+                    info->timestamp);
 }
 
 static void
@@ -1750,7 +1739,6 @@ terminal_window_map_event (GtkWidget    *widget,
     return FALSE;
 }
 
-
 static gboolean
 terminal_window_state_event (GtkWidget            *widget,
                              GdkEventWindowState  *event)
@@ -1882,17 +1870,17 @@ terminal_window_init (TerminalWindow *window)
     const GtkActionEntry menu_entries[] =
     {
         /* Toplevel */
-        { "File", NULL, N_("_File") },
-        { "FileNewWindowProfiles", "utilities-terminal", N_("Open _Terminal")},
-        { "FileNewTabProfiles", STOCK_NEW_TAB, N_("Open Ta_b") },
-        { "Edit", NULL, N_("_Edit") },
-        { "View", NULL, N_("_View") },
-        { "Search", NULL, N_("_Search") },
-        { "Terminal", NULL, N_("_Terminal") },
-        { "Tabs", NULL, N_("Ta_bs") },
-        { "Help", NULL, N_("_Help") },
-        { "Popup", NULL, NULL },
-        { "NotebookPopup", NULL, "" },
+        { "File", NULL, N_("_File"), NULL, NULL, NULL },
+        { "FileNewWindowProfiles", "utilities-terminal", N_("Open _Terminal"), NULL, NULL, NULL },
+        { "FileNewTabProfiles", STOCK_NEW_TAB, N_("Open Ta_b"), NULL, NULL, NULL },
+        { "Edit", NULL, N_("_Edit"), NULL, NULL, NULL },
+        { "View", NULL, N_("_View"), NULL, NULL, NULL },
+        { "Search", NULL, N_("_Search"), NULL, NULL, NULL },
+        { "Terminal", NULL, N_("_Terminal"), NULL, NULL, NULL },
+        { "Tabs", NULL, N_("Ta_bs"), NULL, NULL, NULL },
+        { "Help", NULL, N_("_Help"), NULL, NULL, NULL },
+        { "Popup", NULL, NULL, NULL, NULL, NULL },
+        { "NotebookPopup", NULL, "", NULL, NULL, NULL },
 
         /* File menu */
         {
@@ -2015,7 +2003,7 @@ terminal_window_init (TerminalWindow *window)
 #endif
 
         /* Terminal menu */
-        { "TerminalProfiles", NULL, N_("Change _Profile") },
+        { "TerminalProfiles", NULL, N_("Change _Profile"), NULL, NULL, NULL },
         {
             "ProfilePrevious", NULL, N_("_Previous Profile"), "<alt>Page_Up",
             NULL,
@@ -2031,7 +2019,7 @@ terminal_window_init (TerminalWindow *window)
             NULL,
             G_CALLBACK (terminal_set_title_callback)
         },
-        { "TerminalSetEncoding", NULL, N_("Set _Character Encoding") },
+        { "TerminalSetEncoding", NULL, N_("Set _Character Encoding"), NULL, NULL, NULL },
         {
             "TerminalReset", NULL, N_("_Reset"), NULL,
             NULL,
@@ -2120,7 +2108,7 @@ terminal_window_init (TerminalWindow *window)
             NULL,
             G_CALLBACK (popup_copy_url_callback)
         },
-        { "PopupTerminalProfiles", NULL, N_("P_rofiles") },
+        { "PopupTerminalProfiles", NULL, N_("P_rofiles"), NULL, NULL, NULL },
         {
             "PopupCopy", "edit-copy", N_("_Copy"), "",
             NULL,
@@ -2142,17 +2130,17 @@ terminal_window_init (TerminalWindow *window)
             G_CALLBACK (file_new_window_callback)
         },
         {
-            "PopupNewTab", NULL, N_("Open Ta_b"), NULL,
+            "PopupNewTab", "tab-new", N_("Open Ta_b"), NULL,
             NULL,
             G_CALLBACK (file_new_tab_callback)
         },
         {
-            "PopupCloseWindow", NULL, N_("C_lose Window"), NULL,
+            "PopupCloseWindow", "window-close", N_("C_lose Window"), NULL,
             NULL,
             G_CALLBACK (file_close_window_callback)
         },
         {
-            "PopupCloseTab", NULL, N_("C_lose Tab"), NULL,
+            "PopupCloseTab", "window-close", N_("C_lose Tab"), NULL,
             NULL,
             G_CALLBACK (file_close_tab_callback)
         },
@@ -2161,7 +2149,7 @@ terminal_window_init (TerminalWindow *window)
             NULL,
             G_CALLBACK (popup_leave_fullscreen_callback)
         },
-        { "PopupInputMethods", NULL, N_("_Input Methods") }
+        { "PopupInputMethods", NULL, N_("_Input Methods"), NULL, NULL, NULL }
     };
 
     const GtkToggleActionEntry toggle_menu_entries[] =
@@ -2208,8 +2196,6 @@ terminal_window_init (TerminalWindow *window)
 
     GtkStyleContext *context;
 
-    GSettings *settings = g_settings_new ("org.mate.terminal.global");
-
     context = gtk_widget_get_style_context (GTK_WIDGET (window));
     gtk_style_context_add_class (context, "mate-terminal");
 
@@ -2228,9 +2214,9 @@ terminal_window_init (TerminalWindow *window)
     gtk_notebook_set_show_tabs (GTK_NOTEBOOK (priv->notebook), FALSE);
     gtk_notebook_set_group_name (GTK_NOTEBOOK (priv->notebook), I_("mate-terminal-window"));
     g_signal_connect (priv->notebook, "button-press-event",
-                      G_CALLBACK (notebook_button_press_cb), settings);
+                      G_CALLBACK (notebook_button_press_cb), settings_global);
     g_signal_connect (window, "key-press-event",
-                      G_CALLBACK (window_key_press_cb), settings);
+                      G_CALLBACK (window_key_press_cb), settings_global);
     g_signal_connect (priv->notebook, "popup-menu",
                       G_CALLBACK (notebook_popup_menu_cb), window);
     g_signal_connect_after (priv->notebook, "switch-page",
@@ -2547,8 +2533,6 @@ sync_screen_icon_title (TerminalScreen *screen,
         return;
 
     gdk_window_set_icon_name (gtk_widget_get_window (GTK_WIDGET (window)), terminal_screen_get_icon_title (screen));
-
-    priv->icon_title_set = TRUE;
 }
 
 static void
@@ -2561,10 +2545,6 @@ sync_screen_icon_title_set (TerminalScreen *screen,
     if (!gtk_widget_get_realized (GTK_WIDGET (window)))
         return;
 
-    /* No need to restore the title if we never set an icon title */
-    if (!priv->icon_title_set)
-        return;
-
     if (screen != priv->active_screen)
         return;
 
@@ -2572,12 +2552,7 @@ sync_screen_icon_title_set (TerminalScreen *screen,
         return;
 
     /* Need to reset the icon name */
-    /* FIXME: Once gtk+ bug 535557 is fixed, use that to unset the icon title. */
-
-    g_object_set_qdata (G_OBJECT (gtk_widget_get_window (GTK_WIDGET (window))),
-                        g_quark_from_static_string ("gdk-icon-name-set"),
-                        GUINT_TO_POINTER (FALSE));
-    priv->icon_title_set = FALSE;
+    gdk_window_set_icon_name (gtk_widget_get_window (GTK_WIDGET (window)), NULL);
 
     /* Re-setting the right title will be done by the notify::title handler which comes after this one */
 }
@@ -2737,7 +2712,7 @@ terminal_window_set_menubar_visible (TerminalWindow *window,
     if (setting == priv->menubar_visible)
         return;
 
-    priv->menubar_visible = setting;
+    priv->menubar_visible = (setting != FALSE);
 
     G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
     action = gtk_action_group_get_action (priv->action_group, "ViewMenubar");
@@ -2947,7 +2922,9 @@ notebook_button_press_cb (GtkWidget *widget,
     if ((event->type == GDK_BUTTON_PRESS && event->button == 2) &&
             (g_settings_get_boolean (settings, "middle-click-closes-tabs")))
     {
-        tab_clicked = find_tab_num_at_pos (notebook, event->x_root, event->y_root);
+        tab_clicked = find_tab_num_at_pos (notebook,
+                                           (int)event->x_root,
+                                           (int)event->y_root);
         if (tab_clicked >= 0)
         {
             before_pages = gtk_notebook_get_n_pages (GTK_NOTEBOOK (notebook));
@@ -2980,7 +2957,9 @@ notebook_button_press_cb (GtkWidget *widget,
             (event->state & gtk_accelerator_get_default_mod_mask ()) != 0)
         return FALSE;
 
-    tab_clicked = find_tab_num_at_pos (notebook, event->x_root, event->y_root);
+    tab_clicked = find_tab_num_at_pos (notebook,
+                                       (int)event->x_root,
+                                       (int)event->y_root);
     if (tab_clicked < 0)
         return FALSE;
 
@@ -3568,24 +3547,16 @@ static gboolean
 confirm_close_window_or_tab (TerminalWindow *window,
                              TerminalScreen *screen)
 {
+    GtkBuilder *builder;
     TerminalWindowPrivate *priv = window->priv;
     GtkWidget *dialog;
-    GSettings *settings;
     gboolean do_confirm;
     gboolean has_processes;
     int n_tabs;
     char *confirm_msg;
 
-    if (priv->confirm_close_dialog)
-    {
-        /* WTF, already have one? It's modal, so how did that happen? */
-        gtk_dialog_response (GTK_DIALOG (priv->confirm_close_dialog),
-                             GTK_RESPONSE_DELETE_EVENT);
-    }
+    do_confirm = g_settings_get_boolean (settings_global, "confirm-window-close");
 
-    settings = g_settings_new (CONF_GLOBAL_SCHEMA);
-    do_confirm = g_settings_get_boolean (settings, "confirm-window-close");
-    g_object_unref (settings);
     if (!do_confirm)
         return FALSE;
 
@@ -3615,34 +3586,30 @@ confirm_close_window_or_tab (TerminalWindow *window,
         g_list_free (tabs);
     }
 
-
     if (has_processes)
     {
         if (n_tabs > 1)
-            confirm_msg = _("There are still processes running in some terminals in this window. "
+            confirm_msg = _("There are still processes running in some terminals in this window.\n"
                             "Closing the window will kill all of them.");
         else
-            confirm_msg = _("There is still a process running in this terminal. "
+            confirm_msg = _("There is still a process running in this terminal.\n"
                             "Closing the terminal will kill it.");
     } else if (n_tabs > 1)
             confirm_msg = _("There are multiple tabs open in this window.");
     else
         return FALSE;
 
-    dialog = priv->confirm_close_dialog =
-                 gtk_message_dialog_new (GTK_WINDOW (window),
-                                         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-                                         GTK_MESSAGE_WARNING,
-                                         GTK_BUTTONS_CANCEL,
-                                         "%s", n_tabs > 1 ? _("Close this window?") : _("Close this terminal?"));
-
-    gtk_message_dialog_format_secondary_text (GTK_MESSAGE_DIALOG (dialog),
-            "%s", confirm_msg);
-
-    gtk_window_set_title (GTK_WINDOW (dialog), "");
-
-    gtk_dialog_add_button (GTK_DIALOG (dialog), n_tabs > 1 ? _("C_lose Window") : _("C_lose Terminal"), GTK_RESPONSE_ACCEPT);
-    gtk_dialog_set_default_response (GTK_DIALOG (dialog), GTK_RESPONSE_ACCEPT);
+    builder = gtk_builder_new_from_resource (TERMINAL_RESOURCES_PATH_PREFIX G_DIR_SEPARATOR_S "ui/confirm-close-dialog.ui");
+    priv->confirm_close_dialog = dialog = GTK_WIDGET (gtk_builder_get_object (builder, "confirm_close_dialog"));
+    if (n_tabs > 1) {
+        gtk_label_set_text (GTK_LABEL (gtk_builder_get_object (builder, "question_text")), _("Close this window?"));
+        gtk_button_set_label (GTK_BUTTON (gtk_builder_get_object (builder, "button_close")), _("C_lose Window"));
+    } else {
+        gtk_label_set_text (GTK_LABEL (gtk_builder_get_object (builder, "question_text")), _("Close this terminal?"));
+        gtk_button_set_label (GTK_BUTTON (gtk_builder_get_object (builder, "button_close")), _("C_lose Terminal"));
+    }
+    gtk_label_set_text (GTK_LABEL (gtk_builder_get_object (builder, "description_text")), confirm_msg);
+    g_object_unref (builder);
 
     g_object_set_data (G_OBJECT (dialog), "close-screen", screen);
 
@@ -3651,6 +3618,8 @@ confirm_close_window_or_tab (TerminalWindow *window,
     g_signal_connect (dialog, "response",
                       G_CALLBACK (confirm_close_response_cb), window);
 
+    gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (window));
+    gtk_window_set_title (GTK_WINDOW (dialog), "");
     gtk_window_present (GTK_WINDOW (dialog));
 
     return TRUE;
@@ -4059,7 +4028,6 @@ view_zoom_normal_callback (GtkAction *action,
     terminal_window_update_zoom_sensitivity (window);
 }
 
-
 static void
 search_find_response_callback (GtkWidget *dialog,
                                int        response,
@@ -4068,7 +4036,7 @@ search_find_response_callback (GtkWidget *dialog,
     TerminalWindow *window = TERMINAL_WINDOW (user_data);
     TerminalWindowPrivate *priv = window->priv;
     TerminalSearchFlags flags;
-    GRegex *regex;
+    VteRegex *regex;
 
     if (response != GTK_RESPONSE_ACCEPT)
         return;
@@ -4081,7 +4049,7 @@ search_find_response_callback (GtkWidget *dialog,
 
     flags = terminal_search_dialog_get_search_flags (dialog);
 
-    vte_terminal_search_set_gregex (VTE_TERMINAL (priv->active_screen), regex, 0);
+    vte_terminal_search_set_regex (VTE_TERMINAL (priv->active_screen), regex, 0);
     vte_terminal_search_set_wrap_around (VTE_TERMINAL (priv->active_screen),
                                          (flags & TERMINAL_SEARCH_FLAG_WRAP_AROUND));
 
@@ -4152,7 +4120,7 @@ search_clear_highlight_callback (GtkAction *action,
     if (G_UNLIKELY (!window->priv->active_screen))
         return;
 
-    vte_terminal_search_set_gregex (VTE_TERMINAL (window->priv->active_screen), NULL, 0);
+    vte_terminal_search_set_regex (VTE_TERMINAL (window->priv->active_screen), NULL, 0);
 }
 
 static void
@@ -4234,53 +4202,29 @@ static void
 terminal_set_title_callback (GtkAction *action,
                              TerminalWindow *window)
 {
+    GtkBuilder *builder;
     TerminalWindowPrivate *priv = window->priv;
-    GtkWidget *dialog, *message_area, *hbox, *label, *entry;
+    GtkWidget *dialog, *entry;
 
     if (priv->active_screen == NULL)
         return;
 
-    /* FIXME: hook the screen up so this dialogue closes if the terminal screen closes */
+    builder = gtk_builder_new_from_resource (TERMINAL_RESOURCES_PATH_PREFIX G_DIR_SEPARATOR_S "ui/set-title-dialog.ui");
+    dialog = GTK_WIDGET (gtk_builder_get_object (builder, "dialog"));
+    entry = GTK_WIDGET (gtk_builder_get_object (builder, "title_entry"));
+    g_object_unref (builder);
 
-    dialog = gtk_message_dialog_new (GTK_WINDOW (window),
-                                     GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-                                     GTK_MESSAGE_OTHER,
-                                     GTK_BUTTONS_OK_CANCEL,
-                                     "%s", "");
-
-    gtk_window_set_title (GTK_WINDOW (dialog), _("Set Title"));
-    gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
-    gtk_window_set_role (GTK_WINDOW (dialog), "mate-terminal-change-title");
-    gtk_dialog_set_default_response (GTK_DIALOG (dialog), GTK_RESPONSE_OK);
-    /* Alternative button order was set automatically by GtkMessageDialog */
+    gtk_widget_grab_focus (entry);
+    gtk_entry_set_text (GTK_ENTRY (entry), terminal_screen_get_raw_title (priv->active_screen));
+    gtk_editable_select_region (GTK_EDITABLE (entry), 0, -1);
+    g_object_set_data (G_OBJECT (dialog), "title-entry", entry);
 
     g_signal_connect (dialog, "response",
                       G_CALLBACK (terminal_set_title_dialog_response_cb), priv->active_screen);
     g_signal_connect (dialog, "delete-event",
                       G_CALLBACK (terminal_util_dialog_response_on_delete), NULL);
 
-    message_area = gtk_message_dialog_get_message_area (GTK_MESSAGE_DIALOG (dialog));
-    gtk_container_foreach (GTK_CONTAINER (message_area), (GtkCallback) gtk_widget_hide, NULL);
-
-    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_box_pack_start (GTK_BOX (message_area), hbox, FALSE, FALSE, 0);
-
-    label = gtk_label_new_with_mnemonic (_("_Title:"));
-    gtk_label_set_xalign (GTK_LABEL (label), 0.0);
-    gtk_label_set_yalign (GTK_LABEL (label), 0.5);
-    gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
-
-    entry = gtk_entry_new ();
-    gtk_entry_set_width_chars (GTK_ENTRY (entry), 32);
-    gtk_entry_set_activates_default (GTK_ENTRY (entry), TRUE);
-    gtk_label_set_mnemonic_widget (GTK_LABEL (label), entry);
-    gtk_box_pack_start (GTK_BOX (hbox), entry, TRUE, TRUE, 0);
-    gtk_widget_show_all (hbox);
-
-    gtk_widget_grab_focus (entry);
-    gtk_entry_set_text (GTK_ENTRY (entry), terminal_screen_get_raw_title (priv->active_screen));
-    gtk_editable_select_region (GTK_EDITABLE (entry), 0, -1);
-    g_object_set_data (G_OBJECT (dialog), "title-entry", entry);
+    gtk_window_set_transient_for (GTK_WINDOW (dialog), GTK_WINDOW (window));
 
     gtk_window_present (GTK_WINDOW (dialog));
 }
@@ -4420,9 +4364,9 @@ help_about_callback (GtkAction *action,
     GKeyFile *key_file;
     GError *error = NULL;
     char **authors, **contributors, **artists, **documenters, **array_strv;
+    gchar *comments = NULL;
     gsize data_len, n_authors = 0, n_contributors = 0, n_artists = 0, n_documenters = 0 , i;
     GPtrArray *array;
-
 
     bytes = g_resources_lookup_data (TERMINAL_RESOURCES_PATH_PREFIX G_DIR_SEPARATOR_S "ui/terminal.about",
                                      G_RESOURCE_LOOKUP_FLAGS_NONE,
@@ -4466,6 +4410,9 @@ help_about_callback (GtkAction *action,
 
     licence_text = terminal_util_get_licence_text ();
 
+    comments = g_strdup_printf (_("MATE Terminal is a terminal emulator for the MATE Desktop Environment.\nPowered by Virtual TErminal %d.%d.%d"),
+                                vte_get_major_version (), vte_get_minor_version (), vte_get_micro_version ());
+
     gtk_show_about_dialog (GTK_WINDOW (window),
                            "program-name", _("MATE Terminal"),
                            "version", VERSION,
@@ -4475,8 +4422,8 @@ help_about_callback (GtkAction *action,
                                           "Copyright \xc2\xa9 2006 Guilherme de S. Pastore\n"
                                           "Copyright \xc2\xa9 2007–2010 Christian Persch\n"
                                           "Copyright \xc2\xa9 2011 Perberos\n"
-                                          "Copyright \xc2\xa9 2012-2019 MATE developers"),
-                           "comments", _("A terminal emulator for the MATE desktop"),
+                                          "Copyright \xc2\xa9 2012-2021 MATE developers"),
+                           "comments", comments,
                            "authors", array_strv,
                            "artists", artists,
                            "documenters", documenters,
@@ -4484,9 +4431,10 @@ help_about_callback (GtkAction *action,
                            "wrap-license", TRUE,
                            "translator-credits", _("translator-credits"),
                            "logo-icon-name", MATE_TERMINAL_ICON_NAME,
-                           "website", "https://mate-desktop.org",
+                           "website", PACKAGE_URL,
                            NULL);
 
+    g_free (comments);
     g_strfreev (array_strv);
     g_strfreev (artists);
     g_strfreev (documenters);
@@ -4568,7 +4516,6 @@ terminal_window_save_state (TerminalWindow *window,
     g_key_file_set_string_list (key_file, group, TERMINAL_CONFIG_WINDOW_PROP_TABS, (const char * const *) tab_names, len);
     g_strfreev (tab_names);
 }
-
 
 TerminalWindow *
 terminal_window_get_latest_focused (TerminalWindow *window1,

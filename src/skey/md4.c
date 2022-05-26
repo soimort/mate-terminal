@@ -1,5 +1,6 @@
 /*
  *    Copyright (C) 2001 Nikos Mavroyanopoulos
+ *    Copyright (C) 2012-2021 MATE Developers
  *
  *    This library is free software; you can redistribute it and/or modify it
  *    under the terms of the GNU Library General Public License as published
@@ -22,7 +23,6 @@
  * written by Colin Plumb in 1993.
  */
 
-
 #include <string.h>
 #include <stdlib.h>
 #include "config.h"
@@ -34,7 +34,6 @@
 #define byteReverse(buf, len)	/* Nothing */
 #else
 static void byteReverse(unsigned char *buf, unsigned longs);
-
 
 /*
  * Note: this code is harmless on little-endian machines.
@@ -191,7 +190,6 @@ void MD4Final(unsigned char* digest, MD4_CTX *ctx)
     (a) = rotl32 ((a), (s)); \
   }
 
-
 /*
  * The core of the MD4 algorithm
  */
@@ -255,7 +253,6 @@ void MD4Transform(guint32 buf[4], guint32 const in[16])
 	HH(c, d, a, b, in[7], 11);	/* 47 */
 	HH(b, c, d, a, in[15], 15);	/* 48 */
 
-
 	buf[0] += a;
 	buf[1] += b;
 	buf[2] += c;
@@ -290,7 +287,6 @@ int MD4Keycrunch( char *result, const char *seed, const char *passphrase)
 
 	return 0;
 }
-
 
 void MD4SKey(char *x)
 {

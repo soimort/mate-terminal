@@ -4,6 +4,7 @@
  * Copyright © 2002 Sun Microsystems
  * Copyright © 2003 Mariano Suarez-Alvarez
  * Copyright © 2008 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * Mate-terminal is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -166,7 +167,6 @@ terminal_util_set_atk_name_description (GtkWidget  *widget,
 		           G_STRFUNC);
 		return;
 	}
-
 
 	if (!GTK_IS_ACCESSIBLE (obj))
 		return; /* This means GAIL is not loaded so we have the NoOp accessible */
@@ -868,9 +868,9 @@ widget_change_notify_cb (PropertyChange *change)
 	}
 	else if (GTK_IS_SPIN_BUTTON (widget))
 	{
-		int value;
+		gint value;
 
-		value = (int) gtk_spin_button_get_value (GTK_SPIN_BUTTON (widget));
+		value = gtk_spin_button_get_value_as_int (GTK_SPIN_BUTTON (widget));
 		g_object_set (object, object_prop, value, NULL);
 	}
 	else if (GTK_IS_ENTRY (widget))

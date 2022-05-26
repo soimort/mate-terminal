@@ -1,6 +1,7 @@
 /*
  * Copyright © 2001 Havoc Pennington
  * Copyright © 2008 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -83,6 +84,8 @@ G_BEGIN_DECLS
 typedef struct _TerminalAppClass TerminalAppClass;
 typedef struct _TerminalApp TerminalApp;
 
+extern GSettings *settings_global;
+
 GType terminal_app_get_type (void);
 
 TerminalApp* terminal_app_get (void);
@@ -126,7 +129,6 @@ void terminal_app_edit_keybindings (TerminalApp     *app,
                                     GtkWindow       *transient_parent);
 void terminal_app_edit_encodings   (TerminalApp     *app,
                                     GtkWindow       *transient_parent);
-
 
 GList* terminal_app_get_profile_list (TerminalApp *app);
 

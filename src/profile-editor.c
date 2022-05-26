@@ -2,6 +2,7 @@
  * Copyright © 2002 Havoc Pennington
  * Copyright © 2002 Mathias Hasselmann
  * Copyright © 2008 Christian Persch
+ * Copyright (C) 2012-2021 MATE Developers
  *
  * Mate-terminal is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -486,16 +487,16 @@ custom_command_entry_changed_cb (GtkEntry *entry)
 
 	if (g_shell_parse_argv (command, NULL, NULL, &error))
 	{
-		gtk_entry_set_icon_from_icon_name (entry, GTK_PACK_END, NULL);
+		gtk_entry_set_icon_from_icon_name (entry, GTK_ENTRY_ICON_SECONDARY, NULL);
 	}
 	else
 	{
 		char *tooltip;
 
-		gtk_entry_set_icon_from_icon_name (entry, GTK_PACK_END, "dialog-warning");
+		gtk_entry_set_icon_from_icon_name (entry, GTK_ENTRY_ICON_SECONDARY, "dialog-warning");
 
 		tooltip = g_strdup_printf (_("Error parsing command: %s"), error->message);
-		gtk_entry_set_icon_tooltip_text (entry, GTK_PACK_END, tooltip);
+		gtk_entry_set_icon_tooltip_text (entry, GTK_ENTRY_ICON_SECONDARY, tooltip);
 		g_free (tooltip);
 
 		g_error_free (error);
@@ -534,7 +535,7 @@ init_color_scheme_menu (GtkWidget *widget)
 	GtkCellRenderer *renderer;
 	GtkTreeIter iter;
 	GtkListStore *store;
-	int i;
+	gsize i;
 
 	store = gtk_list_store_new (1, G_TYPE_STRING);
 	for (i = 0; i < G_N_ELEMENTS (color_schemes); ++i)
@@ -652,6 +653,64 @@ terminal_profile_editor_focus_widget (GtkWidget *editor,
 
 	if (gtk_widget_is_sensitive (widget))
 		gtk_widget_grab_focus (widget);
+}
+
+static gboolean
+on_profile_editor_notebook_scroll_event (GtkWidget        *widget,
+                                         GdkEventScroll   *event)
+{
+    GtkNotebook *notebook = GTK_NOTEBOOK (widget);
+    GtkWidget *child, *event_widget, *action_widget;
+
+    child = gtk_notebook_get_nth_page (notebook, gtk_notebook_get_current_page (notebook));
+    if (child == NULL)
+        return FALSE;
+
+    event_widget = gtk_get_event_widget ((GdkEvent*) event);
+
+    /* Ignore scroll events from the content of the page */
+    if (event_widget == NULL || event_widget == child || gtk_widget_is_ancestor (event_widget, child))
+        return FALSE;
+
+    /* And also from the action widgets */
+    action_widget = gtk_notebook_get_action_widget (notebook, GTK_PACK_START);
+    if (event_widget == action_widget || (action_widget != NULL && gtk_widget_is_ancestor (event_widget, action_widget)))
+        return FALSE;
+
+    action_widget = gtk_notebook_get_action_widget (notebook, GTK_PACK_END);
+    if (event_widget == action_widget || (action_widget != NULL && gtk_widget_is_ancestor (event_widget, action_widget)))
+        return FALSE;
+
+    switch (event->direction) {
+        case GDK_SCROLL_RIGHT:
+        case GDK_SCROLL_DOWN:
+            gtk_notebook_next_page (notebook);
+            break;
+        case GDK_SCROLL_LEFT:
+        case GDK_SCROLL_UP:
+            gtk_notebook_prev_page (notebook);
+            break;
+        case GDK_SCROLL_SMOOTH:
+            switch (gtk_notebook_get_tab_pos (notebook)) {
+                case GTK_POS_LEFT:
+                case GTK_POS_RIGHT:
+                    if (event->delta_y > 0)
+                        gtk_notebook_next_page (notebook);
+                    else if (event->delta_y < 0)
+                        gtk_notebook_prev_page (notebook);
+                    break;
+                case GTK_POS_TOP:
+                case GTK_POS_BOTTOM:
+                    if (event->delta_x > 0)
+                        gtk_notebook_next_page (notebook);
+                    else if (event->delta_x < 0)
+                        gtk_notebook_prev_page (notebook);
+                    break;
+            }
+            break;
+    }
+
+    return TRUE;
 }
 
 /**
@@ -848,6 +907,13 @@ terminal_profile_edit (TerminalProfile *profile,
 	                  editor);
 
 	terminal_profile_editor_focus_widget (editor, widget_name);
+
+    w = GTK_WIDGET (gtk_builder_get_object (builder, "profile-editor-notebook"));
+    gtk_widget_add_events (w, GDK_SCROLL_MASK);
+    g_signal_connect (w,
+                      "scroll-event",
+                      G_CALLBACK (on_profile_editor_notebook_scroll_event),
+                      NULL);
 
 	gtk_window_set_transient_for (GTK_WINDOW (editor),
 	                              GTK_WINDOW (transient_parent));
